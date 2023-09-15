@@ -3,10 +3,14 @@ package main
 import (
 	"bwastartup/auth"
 	"bwastartup/handler"
+	"bwastartup/helper"
 	"bwastartup/user"
 	"log"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -32,63 +36,51 @@ func main() {
 	api.POST("/users", userHandler.RegisterUser)
 	api.POST("/sessions", userHandler.Login)
 	api.POST("/email_checkers", userHandler.CheckEmailAvailability)
-	api.POST("/avatars", userHandler.CheckEmailAvailability)
+	api.POST("/avatars", authMiddleware(authService, userService), userHandler.UploadAvatar)
 	router.Run()
 
-	// router.GET("/handler", handler)
-	// router.Run(":8080")
-
-	// userInput := user.RegisterUserInput{}
-	// userInput.Name = "Tes simpan dari service"
-	// userInput.Email = "contoh@gmail.com"
-	// userInput.Occupation = "programmer"
-	// userInput.Password = "oyoyoy"
-
-	// userService.RegisterUser(userInput)
-
-	// user := user.User{
-	// 	Name:             "Test simpan",
-	// 	Occupation:       "TEST",
-	// 	Email:            "TEST",
-	// 	Password_hash:    "TESTJUGA",
-	// 	Avatar_file_name: "TESTJG",
-	// 	Role:             "TESTJG",
-	// }
-	// userRepository.Save(user)
-	// var users []user.User
-	// length := len(users)
-	// fmt.Println(length)
-
-	// db.Find(&users)
-
-	// length = len(users)
-	// fmt.Println(length)
-
-	// for _, user := range users {
-	// 	fmt.Println(user.Name)
-	// 	fmt.Println(user.Email)
-	// 	fmt.Println(user.Created_at)
-	// 	fmt.Println(user.Updated_at)
-
-	// }
 }
 
-// func handler(c *gin.Context) {
-// 	dsn := "root:arasy@ci@tcp(127.0.0.1:3308)/perkemi_db?charset=utf8mb4&parseTime=True&loc=Local"
-// 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+func authMiddleware(authService auth.Service, userService user.Service) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if !strings.Contains(authHeader, "Bearer") {
+			response := helper.APIResponse("Unauthorized", http.StatusUnauthorized, "error", nil)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
 
-// 	if err != nil {
-// 		log.Fatal(err.Error())
-// 	}
+		//Bearer tokentokentoken
+		tokenString := ""
+		arrayToken := strings.Split(authHeader, " ")
+		if len(arrayToken) == 2 {
+			tokenString = arrayToken[1]
+		}
 
-// 	var users []user.User
-// 	db.Find(&users)
+		token, err := authService.ValidateToken(tokenString)
+		if err != nil {
+			response := helper.APIResponse("Unauthorized", http.StatusUnauthorized, "error", nil)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
 
-// 	c.JSON(http.StatusOK, users)
+		claim, ok := token.Claims.(jwt.MapClaims)
+		if !ok || !token.Valid {
+			response := helper.APIResponse("Unauthorized", http.StatusUnauthorized, "error", nil)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
 
-// 	//INPUT
-// 	//HANDLER (MENANGKAP DARI INPUT USER, MAPPING INPUTdari user  KE STRUCT input)
-// 	//SERVICE (MAPPING KE STRUCT User)
-// 	//=REPOSITORY (SAVE STRUCT User ke DB)
-// 	//DB
-// }
+		userID := int(claim["user_id"].(float64))
+		user, err := userService.GetUserByID(userID)
+		if err != nil {
+			response := helper.APIResponse("Unauthorized", http.StatusUnauthorized, "error", nil)
+			c.AbortWithStatusJSON(http.StatusUnauthorized, response)
+			return
+		}
+
+		c.Set("currentUser", user)
+
+	}
+
+}

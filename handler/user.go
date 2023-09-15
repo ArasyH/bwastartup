@@ -155,7 +155,8 @@ func (h *userHandler) UploadAvatar(c *gin.Context) {
 	}
 
 	//MANUAL JWT
-	userID := 1
+	currentUser := c.MustGet("currentUser").(user.User)
+	userID := currentUser.Id
 
 	path := fmt.Sprintf("images/%d-%s", userID, file.Filename)
 
