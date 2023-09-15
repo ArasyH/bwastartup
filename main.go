@@ -4,7 +4,6 @@ import (
 	"bwastartup/auth"
 	"bwastartup/handler"
 	"bwastartup/user"
-	"fmt"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -24,7 +23,7 @@ func main() {
 	userService := user.NewService(userRepository)
 	authService := auth.NewService()
 
-	fmt.Println(authService.GenerateToken(1001))
+	// fmt.Println(authService.GenerateToken(1001))
 
 	userHandler := handler.NewUserHandler(userService, authService)
 
